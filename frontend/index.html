@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Agent Creator with CrewAI</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .container { margin: 20px 0; }
+        textarea { width: 100%; height: 120px; padding: 10px; font-size: 14px; }
+        button { background: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button.execute { background: #28a745; }
+        button.execute:hover { background: #218838; }
+        .result { background: #f8f9fa; padding: 15px; margin-top: 20px; border-radius: 5px; }
+        .agent-list { margin-top: 20px; }
+        .agent-item { background: #e9ecef; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
+        .category-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: white; }
+        .hardware { background-color: #dc3545; }
+        .web { background-color: #28a745; }
+        .communication { background-color: #ffc107; color: black; }
+        .general { background-color: #6c757d; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .connection-status { padding: 10px; margin-bottom: 20px; border-radius: 5px; }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🤖 AI Agent Creator with CrewAI</h1>
+
+    <div id="connection-status" class="connection-status">
+        🔄 Checking backend connection...
+    </div>
+
+    <div class="container">
+        <h3>Create New Agent</h3>
+        <textarea id="prompt" placeholder="Enter your prompt here...
+
+Examples:
+- Create an agent that reads temperature from GPIO pin 18 every minute and logs data
+- Create a web scraping agent that collects latest tech news from TechCrunch
+- Create an agent that sends email notifications when system load is high
+- Create an agent that controls LED lights based on time of day using Raspberry Pi"></textarea>
+        <br><br>
+        <button onclick="createAgent()">Create Agent with CrewAI</button>
+    </div>
+
+    <div id="result" class="result" style="display:none;"></div>
+
+    <div class="agent-list">
+        <h3>Created Agents</h3>
+        <button onclick="loadAgents()">Refresh Agent List</button>
+        <div id="agents"></div>
+    </div>
+
+    <script>
+        // Updated to use port 8000
+        const API_BASE = 'http://localhost:8000';
+
+        async function testConnection() {
+            const statusDiv = document.getElementById('connection-status');
+            try {
+                const response = await fetch(`${API_BASE}/`);
+                const result = await response.json();
+                console.log('Backend connection:', result.message);
+                statusDiv.innerHTML = '✅ Connected to backend: ' + result.message;
+                statusDiv.className = 'connection-status connected';
+            } catch (error) {
+                console.error('Backend connection failed:', error);
+                statusDiv.innerHTML = '❌ Cannot connect to backend server on port 8000. Make sure it\'s running!';
+                statusDiv.className = 'connection-status disconnected';
+            }
+        }
+
+        async function createAgent() {
+            const prompt = document.getElementById('prompt').value;
+            if (!prompt.trim()) {
+                alert('Please enter a prompt');
+                return;
+            }
+
+            document.getElementById('result').style.display = 'block';
+            document.getElementById('result').innerHTML = '🔄 Creating agent with CrewAI...';
+
+            try {
+                const response = await fetch(`${API_BASE}/create-agent`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({prompt: prompt})
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                document.getElementById('result').innerHTML = `
+                    <h4>✅ Agent Created Successfully!</h4>
+                    <p><strong>Agent ID:</strong> ${result.agent_id}</p>
+                    <p><strong>Category:</strong> <span class="category-badge ${result.category}">${result.category}</span></p>
+                    <p><strong>Role:</strong> ${result.role}</p>
+                    <p><strong>Goal:</strong> ${result.goal}</p>
+                    <details>
+                        <summary>Generated Code (Click to expand)</summary>
+                        <pre>${result.code}</pre>
+                    </details>
+                `;
+                loadAgents();
+            } catch (error) {
+                document.getElementById('result').innerHTML = `❌ Error: ${error.message}`;
+                console.error('Create agent error:', error);
+            }
+        }
+
+        async function executeAgent(agentId) {
+            try {
+                const response = await fetch(`${API_BASE}/execute-agent/${agentId}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                let message = `Execution Result:\n${result.result}`;
+                if (result.error) {
+                    message += `\n\nError: ${result.error}`;
+                }
+                alert(message);
+            } catch (error) {
+                alert(`Error executing agent: ${error.message}`);
+            }
+        }
+
+        async function loadAgents() {
+            try {
+                const response = await fetch(`${API_BASE}/agents`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const agents = await response.json();
+
+                const agentsDiv = document.getElementById('agents');
+                if (agents.length === 0) {
+                    agentsDiv.innerHTML = '<p>No agents created yet.</p>';
+                } else {
+                    agentsDiv.innerHTML = agents.map(agent =>
+                        `<div class="agent-item">
+                            <strong>Role:</strong> ${agent.role}<br>
+                            <strong>Category:</strong> <span class="category-badge ${agent.category}">${agent.category}</span><br>
+                            <strong>Goal:</strong> ${agent.goal}<br>
+                            <strong>ID:</strong> ${agent.id}<br>
+                            <button class="execute" onclick="executeAgent('${agent.id}')">
+                                ${agent.category === 'hardware' ? 'Deploy to Pi' : 'Execute'}
+                            </button>
+                        </div>`
+                    ).join('');
+                }
+            } catch (error) {
+                document.getElementById('agents').innerHTML = `Error loading agents: ${error.message}`;
+                console.error('Load agents error:', error);
+            }
+        }
+
+        // Initialize when page loads
+        window.onload = function() {
+            testConnection();
+            loadAgents();
+        };
+    </script>
+</body>
+</html>
