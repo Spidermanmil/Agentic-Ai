@@ -3,302 +3,623 @@ from flask_cors import CORS
 import uuid
 import os
 import json
-from crewai import Agent, Task, Crew, Process
-from crewai_tools import SerperDevTool
+import subprocess
+import time
+from datetime import datetime
+import requests
+import logging
 
 app = Flask(__name__)
 CORS(app)
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class AgentCreator:
+
+class GeminiAgentCreator:
     def __init__(self):
-        self.search_tool = SerperDevTool()
+        self.gemini_api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
-    def parse_prompt(self, prompt):
-        """Parse user prompt to determine agent type and requirements"""
-        prompt_lower = prompt.lower()
+    def validate_api_key(self, api_key):
+        """Validate Gemini API key by making a test request"""
+        if not api_key or not api_key.startswith('AIza'):
+            return False, "Invalid API key format"
 
-        # Determine agent category
-        if any(word in prompt_lower for word in ['temperature', 'sensor', 'gpio', 'led', 'raspberry', 'hardware']):
-            category = 'hardware'
-        elif any(word in prompt_lower for word in ['web', 'scrape', 'website', 'data', 'api']):
-            category = 'web'
-        elif any(word in prompt_lower for word in ['email', 'notification', 'alert', 'message']):
-            category = 'communication'
-        else:
-            category = 'general'
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        }
 
-        return category
+        test_payload = {
+            "contents": [
+                {
+                    "parts": [{"text": "Hello"}]
+                }
+            ]
+        }
 
-    def create_agent_config(self, prompt, category):
-        """Create CrewAI agent configuration based on prompt"""
+        try:
+            response = requests.post(
+                self.gemini_api_url,
+                headers=headers,
+                json=test_payload,
+                timeout=10
+            )
 
-        configs = {
-            'hardware': {
-                'role': 'Hardware Control Specialist',
-                'goal': f'Execute hardware-related tasks: {prompt}',
-                'backstory': 'You are an expert in embedded systems and IoT devices. You excel at controlling sensors, actuators, and GPIO interfaces on Raspberry Pi and similar hardware platforms.',
-                'tools': [],
-                'code_template': '''
-import RPi.GPIO as GPIO
-import time
-from datetime import datetime
+            if response.status_code == 200:
+                logger.info("API key validation successful")
+                return True, "Valid API key"
+            else:
+                error_msg = response.json().get('error', {}).get('message', 'Unknown error')
+                logger.warning(f"API key validation failed: {error_msg}")
+                return False, f"API validation failed: {error_msg}"
 
-class HardwareAgent:
-    def __init__(self):
-        GPIO.setmode(GPIO.BCM)
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API key validation error: {str(e)}")
+            return False, f"Connection error: {str(e)}"
 
-    def execute_task(self):
-        """Generated based on user prompt"""
-        # Hardware control logic here
-        print(f"Hardware agent executing: {prompt}")
-        return "Hardware task completed"
+    def generate_functional_agent_code(self, prompt, api_key):
+        """Generate a functional agent that handles user input and AI responses"""
 
-    def cleanup(self):
-        GPIO.cleanup()
+        # For conversational/chat agents, generate a template that works
+        if any(word in prompt.lower() for word in
+               ['input', 'user', 'chat', 'talk', 'conversation', 'reply', 'respond']):
+            return self.create_chat_agent_template(prompt), "success"
 
-if __name__ == "__main__":
-    agent = HardwareAgent()
-    try:
-        result = agent.execute_task()
-        print(result)
-    finally:
-        agent.cleanup()
-'''
-            },
-            'web': {
-                'role': 'Web Data Specialist',
-                'goal': f'Handle web-related tasks: {prompt}',
-                'backstory': 'You are skilled at web scraping, API interactions, and data extraction from online sources.',
-                'tools': [self.search_tool],
-                'code_template': '''
+        # For other types, use Gemini to generate code
+        return self.generate_agent_code_with_gemini(prompt, api_key)
+
+    def create_chat_agent_template(self, prompt):
+        """Create a working chat agent template"""
+
+        code = f'''"""
+AI-Enhanced Chat Agent
+Original Prompt: {prompt}
+Generated with Gemini AI on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+SECURITY: API keys are handled securely and not exposed in code
+"""
+
 import requests
-from bs4 import BeautifulSoup
 import json
-import time
-
-class WebAgent:
-    def __init__(self):
-        self.session = requests.Session()
-
-    def execute_task(self):
-        """Generated based on user prompt"""
-        # Web scraping/API logic here
-        print(f"Web agent executing: {prompt}")
-        return "Web task completed"
-
-if __name__ == "__main__":
-    agent = WebAgent()
-    result = agent.execute_task()
-    print(result)
-'''
-            },
-            'communication': {
-                'role': 'Communication Specialist',
-                'goal': f'Handle communication tasks: {prompt}',
-                'backstory': 'You excel at sending notifications, emails, and managing communication workflows.',
-                'tools': [],
-                'code_template': '''
-import smtplib
-from email.mime.text import MIMEText
+import logging
+import os
+import sys
 from datetime import datetime
 
-class CommunicationAgent:
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class GeminiChatAgent:
+    """Interactive AI chat agent using Gemini API"""
+
     def __init__(self):
-        self.smtp_server = "smtp.gmail.com"
-        self.port = 587
+        self.api_key = self.get_api_key()
+        self.api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        self.conversation_history = []
+        self.original_prompt = """{prompt}"""
+
+        print("🤖 AI Chat Agent Initialized")
+        print("💬 Ready to chat! Type 'exit' to quit.")
+
+    def get_api_key(self):
+        """Get API key from command line arguments or environment"""
+        if len(sys.argv) > 1:
+            return sys.argv[1]
+
+        api_key = os.getenv('GEMINI_API_KEY')
+        if api_key:
+            return api_key
+
+        return 'PLACEHOLDER_API_KEY'
+
+    def make_gemini_request(self, user_message):
+        """Send message to Gemini API and get response"""
+        if self.api_key == 'PLACEHOLDER_API_KEY':
+            return {{
+                'error': True,
+                'message': "❌ API key not configured. Please provide a valid Gemini API key."
+            }}
+
+        try:
+            headers = {{
+                "x-goog-api-key": self.api_key,
+                "Content-Type": "application/json"
+            }}
+
+            # Build conversation context
+            conversation_text = ""
+            if self.conversation_history:
+                conversation_text = "\\n\\nPrevious conversation:\\n"
+                for entry in self.conversation_history[-5:]:  # Last 5 exchanges
+                    conversation_text += f"User: {{entry['user']}}\\n"
+                    conversation_text += f"Assistant: {{entry['assistant']}}\\n"
+
+            full_prompt = f"You are a helpful AI assistant. Respond naturally and helpfully.{{conversation_text}}\\n\\nUser: {{user_message}}\\nAssistant:"
+
+            payload = {{
+                "contents": [
+                    {{
+                        "parts": [
+                            {{
+                                "text": full_prompt
+                            }}
+                        ]
+                    }}
+                ],
+                "generationConfig": {{
+                    "temperature": 0.7,
+                    "maxOutputTokens": 1000,
+                    "topP": 0.8,
+                    "topK": 40
+                }}
+            }}
+
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+
+                if 'candidates' in result and result['candidates']:
+                    ai_response = result['candidates'][0]['content']['parts'][0]['text']
+
+                    # Add to conversation history
+                    self.conversation_history.append({{
+                        'user': user_message,
+                        'assistant': ai_response,
+                        'timestamp': datetime.now().isoformat()
+                    }})
+
+                    return {{
+                        'error': False,
+                        'message': ai_response,
+                        'timestamp': datetime.now().isoformat()
+                    }}
+                else:
+                    return {{
+                        'error': True,
+                        'message': "No response generated by Gemini"
+                    }}
+            else:
+                error_data = response.json()
+                error_msg = error_data.get('error', {{}}).get('message', f'HTTP {{response.status_code}}')
+                return {{
+                    'error': True,
+                    'message': f"API Error: {{error_msg}}"
+                }}
+
+        except requests.exceptions.Timeout:
+            return {{
+                'error': True,
+                'message': "Request timed out. Please try again."
+            }}
+        except requests.exceptions.RequestException as e:
+            return {{
+                'error': True,
+                'message': f"Network error: {{str(e)}}"
+            }}
+        except Exception as e:
+            logger.exception("Unexpected error in Gemini request")
+            return {{
+                'error': True,
+                'message': f"Unexpected error: {{str(e)}}"
+            }}
+
+    def chat_loop(self):
+        """Interactive chat loop"""
+        print("\\n" + "="*50)
+        print("🤖 AI CHAT AGENT")
+        print("="*50)
+        print("Start chatting! Type 'exit' to quit.")
+        print()
+
+        while True:
+            try:
+                # Get user input
+                user_input = input("You: ").strip()
+
+                if not user_input:
+                    continue
+
+                if user_input.lower() in ['exit', 'quit', 'bye']:
+                    print("\\n👋 Goodbye! Thanks for chatting!")
+                    break
+
+                # Show thinking indicator
+                print("🤔 AI is thinking...")
+
+                # Get AI response
+                response = self.make_gemini_request(user_input)
+
+                if response['error']:
+                    print(f"\\n❌ Error: {{response['message']}}")
+                else:
+                    print(f"\\n🤖 AI: {{response['message']}}")
+
+                print()  # Add spacing
+
+            except KeyboardInterrupt:
+                print("\\n\\n👋 Chat interrupted. Goodbye!")
+                break
+            except Exception as e:
+                print(f"\\n❌ Unexpected error: {{e}}")
+                break
 
     def execute_task(self):
-        """Generated based on user prompt"""
-        # Communication logic here
-        print(f"Communication agent executing: {prompt}")
-        return "Communication task completed"
+        """Main execution method"""
+        try:
+            logger.info("Starting AI Chat Agent")
+
+            # Check API key
+            if self.api_key == 'PLACEHOLDER_API_KEY':
+                print("\\n❌ Error: No Gemini API key provided!")
+                print("Please run with: python agent.py YOUR_GEMINI_API_KEY")
+                print("Or set GEMINI_API_KEY environment variable")
+                return {{
+                    'status': 'error',
+                    'message': 'No API key provided'
+                }}
+
+            # Start chat
+            self.chat_loop()
+
+            # Return conversation summary
+            return {{
+                'status': 'completed',
+                'conversations': len(self.conversation_history),
+                'last_conversation': self.conversation_history[-1] if self.conversation_history else None,
+                'total_time': datetime.now().isoformat()
+            }}
+
+        except Exception as e:
+            logger.exception("Error in execute_task")
+            return {{
+                'status': 'error',
+                'message': str(e)
+            }}
 
 if __name__ == "__main__":
-    agent = CommunicationAgent()
+    agent = GeminiChatAgent()
     result = agent.execute_task()
-    print(result)
+    print(f"\\n📊 Chat session result: {{result}}")
 '''
-            },
-            'general': {
-                'role': 'General Purpose Assistant',
-                'goal': f'Execute general tasks: {prompt}',
-                'backstory': 'You are a versatile assistant capable of handling various computational and analytical tasks.',
-                'tools': [self.search_tool],
-                'code_template': '''
-import json
-import time
-from datetime import datetime
 
-class GeneralAgent:
-    def __init__(self):
-        self.start_time = datetime.now()
+        return code
 
-    def execute_task(self):
-        """Generated based on user prompt"""
-        # General purpose logic here
-        print(f"General agent executing: {prompt}")
-        return "General task completed"
+    def generate_agent_code_with_gemini(self, prompt, api_key):
+        """Generate agent code using Gemini API for non-chat tasks"""
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json"
+        }
 
-if __name__ == "__main__":
-    agent = GeneralAgent()
-    result = agent.execute_task()
-    print(result)
-'''
+        system_prompt = f"""You are an expert Python developer. Create a complete, functional Python class based on this request:
+
+"{prompt}"
+
+Requirements:
+1. Create a complete Python class with proper imports
+2. Include comprehensive error handling and logging
+3. Make it actually functional with real implementations - no placeholder code
+4. Include a main execution method called execute_task()
+5. Use appropriate libraries (requests, json, datetime, etc.)
+6. Include detailed docstrings and comments
+7. Make the code production-ready and robust
+8. NEVER include actual API keys in the generated code - use placeholder text instead
+9. If the task needs AI capabilities, include placeholder comments for API integration
+
+Important: Return ONLY the Python code, no markdown formatting or explanations."""
+
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": system_prompt}]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 3000,
+                "topP": 0.8,
+                "topK": 40
             }
         }
 
-        return configs.get(category, configs['general'])
+        try:
+            response = requests.post(
+                self.gemini_api_url,
+                headers=headers,
+                json=payload,
+                timeout=45
+            )
 
-    def generate_agent(self, prompt):
-        """Generate a CrewAI agent based on user prompt"""
-        category = self.parse_prompt(prompt)
-        config = self.create_agent_config(prompt, category)
+            if response.status_code == 200:
+                result = response.json()
 
-        # Create CrewAI agent
-        agent = Agent(
-            role=config['role'],
-            goal=config['goal'],
-            backstory=config['backstory'],
-            tools=config['tools'],
-            verbose=True,
-            allow_delegation=False
-        )
+                if 'candidates' in result and result['candidates']:
+                    generated_code = result['candidates'][0]['content']['parts'][0]['text']
 
-        # Create a task for the agent
-        task = Task(
-            description=prompt,
-            expected_output="A detailed response addressing the user's request",
-            agent=agent
-        )
+                    # Clean up the code
+                    if "```python" in generated_code:
+                        parts = generated_code.split("```python")
+                        if len(parts) > 1:
+                            generated_code = parts[1].split("```")[0].strip()
+                    elif "```" in generated_code:
+                        parts = generated_code.split("```")
+                        if len(parts) > 1:
+                            generated_code = parts[1].strip()
 
-        # Generate executable code
-        code = config['code_template'].replace('{prompt}', prompt)
+                    # Sanitize code
+                    generated_code = self.sanitize_generated_code(generated_code)
 
-        return {
-            'agent': agent,
-            'task': task,
-            'code': code,
-            'category': category
-        }
+                    logger.info("Agent code generated successfully")
+                    return generated_code, "success"
+
+            else:
+                error_data = response.json()
+                error_msg = error_data.get('error', {}).get('message', 'Unknown error')
+                logger.error(f"Gemini API error: {error_msg}")
+                return None, f"Gemini API error: {error_msg}"
+
+        except requests.exceptions.Timeout:
+            return None, "Request timeout - please try again"
+        except Exception as e:
+            logger.error(f"Code generation error: {str(e)}")
+            return None, f"Code generation failed: {str(e)}"
+
+    def sanitize_generated_code(self, code):
+        """Remove any actual API keys from generated code"""
+        import re
+
+        # Remove any actual API keys that start with common patterns
+        api_key_patterns = [
+            r'AIza[a-zA-Z0-9_-]+',  # Google API keys
+            r'sk-[a-zA-Z0-9]+',  # OpenAI keys
+            r'xoxb-[a-zA-Z0-9-]+',  # Slack tokens
+        ]
+
+        for pattern in api_key_patterns:
+            code = re.sub(pattern, 'YOUR_API_KEY_HERE', code)
+
+        return code
+
+    def create_agent(self, prompt, api_key):
+        """Create a new AI agent"""
+        # Validate API key
+        is_valid, validation_msg = self.validate_api_key(api_key)
+        if not is_valid:
+            return None, validation_msg
+
+        # Generate functional code
+        code, status = self.generate_functional_agent_code(prompt, api_key)
+
+        if code and status == "success":
+            return {
+                'code': code,
+                'model': 'gemini-1.5-flash',
+                'capabilities': [
+                    'Interactive Chat',
+                    'AI-Powered Responses',
+                    'Conversation Memory',
+                    'Natural Language Processing',
+                    'Real-time Communication'
+                ],
+                'description': f"Interactive Gemini-powered agent: {prompt[:100]}{'...' if len(prompt) > 100 else ''}"
+            }, "success"
+        else:
+            return None, status
 
 
 # Initialize the agent creator
-agent_creator = AgentCreator()
+agent_creator = GeminiAgentCreator()
 
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({'message': 'AI Agent Creator API with CrewAI is running!'})
+    """API health check"""
+    return jsonify({
+        'message': 'Gemini AI Agent Creator is running!',
+        'version': '2.1',
+        'ai_model': 'Google Gemini 1.5 Flash',
+        'features': 'Interactive chat agents with conversation memory',
+        'capabilities': [
+            'Interactive Chat Agents',
+            'AI-Powered Conversations',
+            'Real-time Responses',
+            'Secure API Key Handling'
+        ]
+    })
 
 
 @app.route('/create-agent', methods=['POST'])
 def create_agent():
+    """Create a new AI agent from user prompt"""
     try:
-        data = request.json
-        prompt = data.get('prompt', '')
+        data = request.get_json()
+
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+
+        prompt = data.get('prompt', '').strip()
+        gemini_api_key = data.get('gemini_api_key', '').strip()
 
         if not prompt:
             return jsonify({'error': 'Prompt is required'}), 400
 
-        # Generate agent using CrewAI
-        agent_data = agent_creator.generate_agent(prompt)
+        if not gemini_api_key:
+            return jsonify({'error': 'Gemini API key is required'}), 400
+
+        if not gemini_api_key.startswith('AIza'):
+            return jsonify({'error': 'Invalid Gemini API key format. Keys should start with "AIza"'}), 400
+
+        logger.info(f"Creating agent for prompt: {prompt[:50]}...")
+
+        # Create agent using Gemini API
+        agent_data, status = agent_creator.create_agent(prompt, gemini_api_key)
+
+        if agent_data is None:
+            return jsonify({'error': status}), 400
+
+        # Generate unique agent ID
         agent_id = str(uuid.uuid4())
 
-        # Save agent configuration and code
+        # Create agent directory
         agent_dir = f"generated_agents/{agent_id}"
         os.makedirs(agent_dir, exist_ok=True)
 
-        # Save the executable code
-        with open(f"{agent_dir}/agent.py", 'w') as f:
+        # Save agent code
+        agent_file_path = f"{agent_dir}/agent.py"
+        with open(agent_file_path, 'w', encoding='utf-8') as f:
             f.write(agent_data['code'])
 
-        # Save agent metadata
+        # Create metadata
         metadata = {
             'id': agent_id,
             'prompt': prompt,
-            'category': agent_data['category'],
-            'role': agent_data['agent'].role,
-            'goal': agent_data['agent'].goal,
-            'created_at': str(uuid.uuid1().time),
-            'status': 'created'
+            'model': agent_data['model'],
+            'capabilities': agent_data['capabilities'],
+            'description': agent_data['description'],
+            'created_at': datetime.now().isoformat(),
+            'status': 'created',
+            'ai_powered': True,
+            'interactive': True
         }
 
-        with open(f"{agent_dir}/metadata.json", 'w') as f:
+        # Save metadata
+        with open(f"{agent_dir}/metadata.json", 'w', encoding='utf-8') as f:
             json.dump(metadata, f, indent=2)
+
+        logger.info(f"Agent {agent_id} created successfully")
 
         return jsonify({
             'agent_id': agent_id,
             'status': 'created',
-            'category': agent_data['category'],
-            'role': agent_data['agent'].role,
-            'goal': agent_data['agent'].goal,
-            'code': agent_data['code']
+            'prompt': prompt,
+            'model': agent_data['model'],
+            'capabilities': agent_data['capabilities'],
+            'description': agent_data['description'],
+            'created_at': metadata['created_at'],
+            'code': agent_data['code'][:500] + '...' if len(agent_data['code']) > 500 else agent_data['code']
         })
 
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/agents', methods=['GET'])
-def list_agents():
-    try:
-        agents_dir = "generated_agents"
-        if not os.path.exists(agents_dir):
-            return jsonify([])
-
-        agents = []
-        for agent_id in os.listdir(agents_dir):
-            metadata_path = f"{agents_dir}/{agent_id}/metadata.json"
-            if os.path.exists(metadata_path):
-                with open(metadata_path, 'r') as f:
-                    metadata = json.load(f)
-                    agents.append(metadata)
-
-        return jsonify(agents)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Agent creation error: {str(e)}")
+        return jsonify({'error': f'Failed to create agent: {str(e)}'}), 500
 
 
 @app.route('/execute-agent/<agent_id>', methods=['POST'])
 def execute_agent(agent_id):
-    """Execute an agent's code (for software agents only)"""
+    """Execute an AI agent securely"""
     try:
         agent_dir = f"generated_agents/{agent_id}"
-        if not os.path.exists(agent_dir):
+        agent_script = f"{agent_dir}/agent.py"
+
+        if not os.path.exists(agent_script):
             return jsonify({'error': 'Agent not found'}), 404
 
-        # Load metadata to check if it's safe to execute
-        with open(f"{agent_dir}/metadata.json", 'r') as f:
-            metadata = json.load(f)
+        # Get API key from request for execution
+        data = request.get_json()
+        gemini_api_key = data.get('gemini_api_key', '') if data else ''
 
-        if metadata['category'] == 'hardware':
-            return jsonify({
-                'result': 'Hardware agents should be deployed to Raspberry Pi',
-                'status': 'deployment_required'
-            })
+        if not gemini_api_key:
+            return jsonify({'error': 'Gemini API key required for agent execution'}), 400
 
-        # For software agents, we can execute them locally
-        import subprocess
+        logger.info(f"Executing agent {agent_id}")
+
+        # Execute the agent with API key passed as argument
         result = subprocess.run(
-            ['python', f"{agent_dir}/agent.py"],
+            ['python', agent_script, gemini_api_key],
+            cwd=agent_dir,
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=300  # 5 minutes for interactive agents
         )
 
-        return jsonify({
-            'result': result.stdout,
+        execution_result = {
+            'status': 'completed',
+            'agent_id': agent_id,
+            'return_code': result.returncode,
+            'output': result.stdout,
             'error': result.stderr if result.stderr else None,
-            'status': 'executed'
-        })
+            'executed_at': datetime.now().isoformat(),
+            'ai_powered': True,
+            'interactive': True
+        }
+
+        if result.returncode == 0:
+            logger.info(f"Agent {agent_id} executed successfully")
+        else:
+            logger.warning(f"Agent {agent_id} execution failed with return code {result.returncode}")
+
+        return jsonify(execution_result)
 
     except subprocess.TimeoutExpired:
-        return jsonify({'error': 'Agent execution timed out'}), 408
+        logger.error(f"Agent {agent_id} execution timed out")
+        return jsonify({
+            'error': 'Agent execution timed out (5 minutes limit)',
+            'agent_id': agent_id
+        }), 408
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Agent execution error: {str(e)}")
+        return jsonify({'error': f'Execution failed: {str(e)}'}), 500
+
+
+@app.route('/agents', methods=['GET'])
+def list_agents():
+    """List all created agents"""
+    try:
+        agents_dir = "generated_agents"
+
+        if not os.path.exists(agents_dir):
+            return jsonify([])
+
+        agents = []
+
+        for agent_id in os.listdir(agents_dir):
+            metadata_path = f"{agents_dir}/{agent_id}/metadata.json"
+
+            if os.path.exists(metadata_path):
+                try:
+                    with open(metadata_path, 'r', encoding='utf-8') as f:
+                        metadata = json.load(f)
+                        agents.append(metadata)
+                except Exception as e:
+                    logger.warning(f"Failed to load metadata for agent {agent_id}: {str(e)}")
+                    continue
+
+        # Sort by creation date (newest first)
+        agents.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+
+        return jsonify(agents)
+
+    except Exception as e:
+        logger.error(f"Failed to list agents: {str(e)}")
+        return jsonify({'error': f'Failed to list agents: {str(e)}'}), 500
+
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint not found'}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8000)
+    print("🚀 Starting Interactive AI Agent Creator...")
+    print("🧠 Powered by Google Gemini 1.5 Flash")
+    print("💬 Creating interactive chat agents with conversation memory")
+    print("🔐 API keys are handled securely and never exposed")
+    print("=" * 80)
+
+    # Create agents directory if it doesn't exist
+    os.makedirs('generated_agents', exist_ok=True)
+
+    app.run(host='0.0.0.0', port=8000, debug=True)

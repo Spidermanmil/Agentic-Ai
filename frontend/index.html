@@ -1,85 +1,201 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>AI Agent Creator with CrewAI</title>
+    <title>AI Agent Builder - Powered by Gemini</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
-        .container { margin: 20px 0; }
-        textarea { width: 100%; height: 120px; padding: 10px; font-size: 14px; }
-        button { background: #007bff; color: white; padding: 10px 20px; border: none; cursor: pointer; margin: 5px; }
-        button:hover { background: #0056b3; }
-        button.execute { background: #28a745; }
-        button.execute:hover { background: #218838; }
-        .result { background: #f8f9fa; padding: 15px; margin-top: 20px; border-radius: 5px; }
-        .agent-list { margin-top: 20px; }
-        .agent-item { background: #e9ecef; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff; }
-        .category-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: white; }
-        .hardware { background-color: #dc3545; }
-        .web { background-color: #28a745; }
-        .communication { background-color: #ffc107; color: black; }
-        .general { background-color: #6c757d; }
-        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
-        .connection-status { padding: 10px; margin-bottom: 20px; border-radius: 5px; }
-        .connected { background-color: #d4edda; color: #155724; }
-        .disconnected { background-color: #f8d7da; color: #721c24; }
+        body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .container { background: white; padding: 30px; margin: 20px 0; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .api-key-section { border: 2px solid #4285f4; border-radius: 8px; padding: 20px; margin-bottom: 20px; background: #f8f9ff; }
+        .prompt-section { border: 2px solid #34a853; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        input[type="password"], input[type="text"], textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; margin-top: 8px; }
+        textarea { height: 120px; resize: vertical; }
+        button { background: #4285f4; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; font-size: 14px; }
+        button:hover { background: #3367d6; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .create-btn { background: #34a853; font-size: 16px; padding: 15px 30px; }
+        .create-btn:hover { background: #2d7a3e; }
+        .status { padding: 10px; border-radius: 5px; margin: 10px 0; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #cce7ff; color: #004085; border: 1px solid #99d6ff; }
+        .result { background: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border-left: 4px solid #007bff; }
+        .agent-item { background: #fff; padding: 20px; margin: 10px 0; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .agent-header { display: flex; justify-content: between; align-items: center; margin-bottom: 10px; }
+        .agent-status { display: inline-block; padding: 4px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+        .status-created { background: #e3f2fd; color: #1976d2; }
+        .status-running { background: #e8f5e8; color: #388e3c; }
+        .status-error { background: #ffebee; color: #d32f2f; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 13px; }
+        .api-status { float: right; font-size: 12px; padding: 4px 8px; border-radius: 3px; }
+        .api-valid { background: #d4edda; color: #155724; }
+        .api-invalid { background: #f8d7da; color: #721c24; }
+        .usage-info { font-size: 12px; color: #666; margin-top: 5px; }
+        .examples { background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 15px; }
+        .examples h4 { margin-top: 0; color: #856404; }
+        .example-prompt { background: white; padding: 8px; margin: 5px 0; border-radius: 3px; cursor: pointer; font-size: 13px; border: 1px solid #ffeaa7; }
+        .example-prompt:hover { background: #ffeaa7; }
     </style>
 </head>
 <body>
-    <h1>🤖 AI Agent Creator with CrewAI</h1>
-
-    <div id="connection-status" class="connection-status">
-        🔄 Checking backend connection...
+    <div class="header">
+        <h1>🤖 AI Agent Builder</h1>
+        <p>Create intelligent agents using natural language prompts • Powered by Google Gemini</p>
     </div>
 
     <div class="container">
-        <h3>Create New Agent</h3>
-        <textarea id="prompt" placeholder="Enter your prompt here...
+        <div class="api-key-section">
+            <h3>🔑 Gemini API Configuration</h3>
+            <p>Enter your Google Gemini API key to power your AI agents</p>
+
+            <div style="display: flex; gap: 15px; align-items: end;">
+                <div style="flex: 1;">
+                    <label for="apiKey"><strong>Gemini API Key:</strong></label>
+                    <input type="password" id="apiKey" placeholder="Enter your Gemini API key here..." />
+                    <div class="usage-info">
+                        Get your free API key from <a href="https://ai.google.dev/" target="_blank">Google AI Studio</a>
+                    </div>
+                </div>
+                <div>
+                    <button onclick="validateApiKey()">Validate Key</button>
+                    <button onclick="clearApiKey()">Clear</button>
+                </div>
+            </div>
+
+            <div id="apiStatus" class="status" style="display: none;"></div>
+        </div>
+
+        <div class="prompt-section">
+            <h3>💬 Describe Your AI Agent</h3>
+
+            <div class="examples">
+                <h4>💡 Example Prompts (Click to use):</h4>
+                <div class="example-prompt" onclick="setPrompt(this.textContent)">
+                    Create an agent that analyzes text sentiment and generates a detailed emotional report
+                </div>
+                <div class="example-prompt" onclick="setPrompt(this.textContent)">
+                    Build an agent that scrapes websites and uses AI to summarize the content intelligently
+                </div>
+                <div class="example-prompt" onclick="setPrompt(this.textContent)">
+                    Make an agent that processes CSV data and generates AI-powered insights and recommendations
+                </div>
+                <div class="example-prompt" onclick="setPrompt(this.textContent)">
+                    Create an agent that monitors system logs and uses AI to detect anomalies and security threats
+                </div>
+            </div>
+
+            <label for="prompt"><strong>Agent Description:</strong></label>
+            <textarea id="prompt" placeholder="Describe what you want your AI agent to do...
 
 Examples:
-- Create an agent that reads temperature from GPIO pin 18 every minute and logs data
-- Create a web scraping agent that collects latest tech news from TechCrunch
-- Create an agent that sends email notifications when system load is high
-- Create an agent that controls LED lights based on time of day using Raspberry Pi"></textarea>
-        <br><br>
-        <button onclick="createAgent()">Create Agent with CrewAI</button>
+• Create an intelligent customer support agent that analyzes inquiries and generates personalized responses
+• Build a data analysis agent that processes files and provides AI-generated insights
+• Make a content creation agent that generates articles based on topics and research
+• Create a smart automation agent that makes decisions based on real-time data"></textarea>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <button class="create-btn" onclick="createAgent()">
+                    🚀 Create AI Agent with Gemini
+                </button>
+            </div>
+        </div>
+
+        <div id="result" class="result" style="display:none;"></div>
     </div>
 
-    <div id="result" class="result" style="display:none;"></div>
-
-    <div class="agent-list">
-        <h3>Created Agents</h3>
-        <button onclick="loadAgents()">Refresh Agent List</button>
+    <div class="container">
+        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
+            <h3>🤖 Your AI Agents</h3>
+            <button onclick="loadAgents()">🔄 Refresh</button>
+        </div>
         <div id="agents"></div>
     </div>
 
     <script>
-        // Updated to use port 8000
         const API_BASE = 'http://localhost:8000';
+        let currentApiKey = '';
 
-        async function testConnection() {
-            const statusDiv = document.getElementById('connection-status');
-            try {
-                const response = await fetch(`${API_BASE}/`);
-                const result = await response.json();
-                console.log('Backend connection:', result.message);
-                statusDiv.innerHTML = '✅ Connected to backend: ' + result.message;
-                statusDiv.className = 'connection-status connected';
-            } catch (error) {
-                console.error('Backend connection failed:', error);
-                statusDiv.innerHTML = '❌ Cannot connect to backend server on port 8000. Make sure it\'s running!';
-                statusDiv.className = 'connection-status disconnected';
+        // Load saved API key on page load
+        window.onload = function() {
+            const savedKey = sessionStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                document.getElementById('apiKey').value = savedKey;
+                currentApiKey = savedKey;
+                showApiStatus('API key loaded from session', 'info');
+            }
+            loadAgents();
+        };
+
+        function setPrompt(text) {
+            document.getElementById('prompt').value = text;
+        }
+
+        function validateApiKey() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+
+            if (!apiKey) {
+                showApiStatus('Please enter an API key', 'error');
+                return;
+            }
+
+            if (!apiKey.startsWith('AIza')) {
+                showApiStatus('Invalid API key format. Gemini keys start with "AIza"', 'error');
+                return;
+            }
+
+            // Store API key
+            currentApiKey = apiKey;
+            sessionStorage.setItem('gemini_api_key', apiKey);
+
+            showApiStatus('✅ API key validated and saved for this session', 'success');
+        }
+
+        function clearApiKey() {
+            document.getElementById('apiKey').value = '';
+            currentApiKey = '';
+            sessionStorage.removeItem('gemini_api_key');
+            showApiStatus('API key cleared', 'info');
+        }
+
+        function showApiStatus(message, type) {
+            const statusDiv = document.getElementById('apiStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+            statusDiv.style.display = 'block';
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 3000);
             }
         }
 
         async function createAgent() {
-            const prompt = document.getElementById('prompt').value;
-            if (!prompt.trim()) {
-                alert('Please enter a prompt');
+            const prompt = document.getElementById('prompt').value.trim();
+            const apiKey = currentApiKey || document.getElementById('apiKey').value.trim();
+
+            if (!prompt) {
+                alert('Please describe your AI agent');
                 return;
             }
 
+            if (!apiKey) {
+                alert('Please enter your Gemini API key');
+                return;
+            }
+
+            if (!apiKey.startsWith('AIza')) {
+                alert('Invalid API key format. Gemini keys start with "AIza"');
+                return;
+            }
+
+            // Validate API key if not already done
+            if (!currentApiKey) {
+                validateApiKey();
+            }
+
             document.getElementById('result').style.display = 'block';
-            document.getElementById('result').innerHTML = '🔄 Creating agent with CrewAI...';
+            document.getElementById('result').innerHTML = '🔄 Creating AI-powered agent with Gemini...';
 
             try {
                 const response = await fetch(`${API_BASE}/create-agent`, {
@@ -87,7 +203,10 @@ Examples:
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({prompt: prompt})
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        gemini_api_key: apiKey
+                    })
                 });
 
                 if (!response.ok) {
@@ -95,26 +214,31 @@ Examples:
                 }
 
                 const result = await response.json();
+
                 document.getElementById('result').innerHTML = `
-                    <h4>✅ Agent Created Successfully!</h4>
-                    <p><strong>Agent ID:</strong> ${result.agent_id}</p>
-                    <p><strong>Category:</strong> <span class="category-badge ${result.category}">${result.category}</span></p>
-                    <p><strong>Role:</strong> ${result.role}</p>
-                    <p><strong>Goal:</strong> ${result.goal}</p>
-                    <details>
-                        <summary>Generated Code (Click to expand)</summary>
-                        <pre>${result.code}</pre>
+                    <h4>✅ AI Agent Created Successfully!</h4>
+                    <div><strong>Agent ID:</strong> ${result.agent_id}</div>
+                    <div><strong>Type:</strong> Gemini-Powered AI Agent</div>
+                    <div><strong>Capabilities:</strong> ${result.capabilities ? result.capabilities.join(', ') : 'AI-Enhanced Processing'}</div>
+                    <div><strong>Status:</strong> <span class="agent-status status-created">Ready</span></div>
+                    <details style="margin-top: 15px;">
+                        <summary><strong>Generated Code Preview</strong></summary>
+                        <pre>${result.code.substring(0, 500)}${result.code.length > 500 ? '...\n\n[Code truncated - full code available in agent execution]' : ''}</pre>
                     </details>
                 `;
+
                 loadAgents();
+
             } catch (error) {
-                document.getElementById('result').innerHTML = `❌ Error: ${error.message}`;
+                document.getElementById('result').innerHTML = `❌ Error creating agent: ${error.message}`;
                 console.error('Create agent error:', error);
             }
         }
 
         async function executeAgent(agentId) {
             try {
+                showExecutionStatus(agentId, 'Executing AI agent...');
+
                 const response = await fetch(`${API_BASE}/execute-agent/${agentId}`, {
                     method: 'POST'
                 });
@@ -125,13 +249,31 @@ Examples:
 
                 const result = await response.json();
 
-                let message = `Execution Result:\n${result.result}`;
-                if (result.error) {
-                    message += `\n\nError: ${result.error}`;
-                }
-                alert(message);
+                showExecutionResult(agentId, result);
+
             } catch (error) {
-                alert(`Error executing agent: ${error.message}`);
+                showExecutionStatus(agentId, `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showExecutionStatus(agentId, message, type = 'info') {
+            const statusElement = document.getElementById(`status-${agentId}`);
+            if (statusElement) {
+                statusElement.textContent = message;
+                statusElement.className = `status ${type}`;
+            }
+        }
+
+        function showExecutionResult(agentId, result) {
+            const resultElement = document.getElementById(`result-${agentId}`);
+            if (resultElement) {
+                resultElement.innerHTML = `
+                    <h4>🎯 Execution Results:</h4>
+                    <div><strong>Status:</strong> ${result.status}</div>
+                    ${result.output ? `<div><strong>Output:</strong></div><pre>${result.output}</pre>` : ''}
+                    ${result.error ? `<div style="color: red;"><strong>Error:</strong> ${result.error}</div>` : ''}
+                `;
+                resultElement.style.display = 'block';
             }
         }
 
@@ -147,31 +289,35 @@ Examples:
 
                 const agentsDiv = document.getElementById('agents');
                 if (agents.length === 0) {
-                    agentsDiv.innerHTML = '<p>No agents created yet.</p>';
+                    agentsDiv.innerHTML = '<div class="agent-item"><p>No AI agents created yet. Create your first agent above! 👆</p></div>';
                 } else {
-                    agentsDiv.innerHTML = agents.map(agent =>
-                        `<div class="agent-item">
-                            <strong>Role:</strong> ${agent.role}<br>
-                            <strong>Category:</strong> <span class="category-badge ${agent.category}">${agent.category}</span><br>
-                            <strong>Goal:</strong> ${agent.goal}<br>
-                            <strong>ID:</strong> ${agent.id}<br>
-                            <button class="execute" onclick="executeAgent('${agent.id}')">
-                                ${agent.category === 'hardware' ? 'Deploy to Pi' : 'Execute'}
-                            </button>
-                        </div>`
-                    ).join('');
+                    agentsDiv.innerHTML = agents.map(agent => `
+                        <div class="agent-item">
+                            <div class="agent-header">
+                                <div>
+                                    <strong>${agent.prompt || 'AI Agent'}</strong>
+                                    <span class="api-status api-valid">Gemini Powered</span>
+                                </div>
+                                <div>
+                                    <button onclick="executeAgent('${agent.id}')">
+                                        ⚡ Execute Agent
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div><strong>ID:</strong> ${agent.id}</div>
+                            <div><strong>Created:</strong> ${new Date(agent.created_at).toLocaleString()}</div>
+                            <div><strong>AI Model:</strong> Google Gemini</div>
+
+                            <div id="status-${agent.id}" class="status" style="display: none;"></div>
+                            <div id="result-${agent.id}" style="display: none; margin-top: 10px;"></div>
+                        </div>
+                    `).join('');
                 }
             } catch (error) {
-                document.getElementById('agents').innerHTML = `Error loading agents: ${error.message}`;
-                console.error('Load agents error:', error);
+                document.getElementById('agents').innerHTML = `<div class="agent-item">Error loading agents: ${error.message}</div>`;
             }
         }
-
-        // Initialize when page loads
-        window.onload = function() {
-            testConnection();
-            loadAgents();
-        };
     </script>
 </body>
 </html>
