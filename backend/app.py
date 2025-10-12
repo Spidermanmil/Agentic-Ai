@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiAgentCreator:
     def __init__(self):
-        self.gemini_api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        self.gemini_api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
 
     def validate_api_key(self, api_key):
         """Validate Gemini API key by making a test request"""
@@ -389,33 +389,144 @@ Important: Return ONLY the Python code, no markdown formatting or explanations."
         return code
 
     def create_agent(self, prompt, api_key):
-        """Create a new AI agent"""
-        # Validate API key
-        is_valid, validation_msg = self.validate_api_key(api_key)
-        if not is_valid:
-            return None, validation_msg
+        """Create a new AI agent based on the given prompt"""
+        try:
+            # Check if this is a sentiment analysis request
+            if any(term in prompt.lower() for term in ['sentiment', 'emotion', 'feelings', 'mood']):
+                return self.create_sentiment_agent(prompt, api_key)
+                
+            # Generate agent code using Gemini
+            agent_code, status = self.generate_agent_code_with_gemini(prompt, api_key)
+            if agent_code is None:
+                return None, status
+                
+            return {
+                'code': agent_code,
+                'model': 'gemini-2.0-flash',
+                'capabilities': ['text_processing'],
+                'description': f'AI agent for: {prompt[:100]}{"..." if len(prompt) > 100 else ""}'
+            }, "success"
+            
+        except Exception as e:
+            logger.error(f"Error creating agent: {str(e)}", exc_info=True)
+            return None, f"Failed to create agent: {str(e)}"
+            
+    def create_sentiment_agent(self, prompt, api_key):
+        """Create a sentiment analysis agent with proper error handling"""
+        try:
+            code = """import logging
+import json
+from datetime import datetime
+import requests
+from typing import Dict, Optional
 
-        # Generate functional code
-        code, status = self.generate_functional_agent_code(prompt, api_key)
+class SentimentAnalyzer:
+    \"\"\"A class for analyzing text sentiment using the Gemini API\"\"\"
 
-        if code and status == "success":
+    def __init__(self, api_url: str, api_key: str):
+        self.api_url = api_url
+        self.api_key = api_key
+        self.logger = logging.getLogger(__name__)
+        self.setup_logging()
+
+    def setup_logging(self):
+        \"\"\"Configure logging settings\"\"\"
+        self.logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+    def analyze_sentiment(self, text: str) -> Optional[Dict]:
+        \"\"\"Analyze text sentiment using Gemini API\"\"\"
+        if not self.api_url or not self.api_key:
+            self.logger.error(\"API configuration missing\")
+            return None
+
+        prompt = \"\"\"Analyze the sentiment of the following text and return a JSON response with:
+        - sentiment (positive/neutral/negative)
+        - confidence (0.0-1.0)
+        - emotions (dictionary of emotion scores 0.0-1.0)
+        \n        Text: \"\"\" + text
+
+        try:
+            response = requests.post(
+                self.api_url,
+                params={'key': self.api_key},
+                json={
+                    \"contents\": [{
+                        \"parts\": [{\"text\": prompt}]
+                    }]
+                },
+                timeout=30
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            if 'candidates' in result and result['candidates']:
+                response_text = result['candidates'][0]['content']['parts'][0].get('text', '')
+                return self.parse_response(response_text)
+                
+        except Exception as e:
+            self.logger.error(f\"API request failed: {str(e)}\")
+            return None
+
+    def parse_response(self, response_text: str) -> Dict:
+        \"\"\"Parse the API response text into a structured format\"\"\"
+        try:
+            # Clean the response and extract JSON
+            import re
+            json_str = re.search(r'\\{.*\\}', response_text, re.DOTALL)
+            if json_str:
+                return json.loads(json_str.group(0))
+            return {\"error\": \"Invalid response format\"}
+        except Exception as e:
+            self.logger.error(f\"Failed to parse response: {str(e)}\")
+            return {\"error\": str(e)}
+
+    def generate_report(self, sentiment_data: Dict) -> str:
+        \"\"\"Generate a human-readable report from sentiment data\"\"\"
+        if not sentiment_data or 'error' in sentiment_data:
+            return \"Unable to analyze sentiment. Please try again later.\"
+            
+        report = [
+            f\"Sentiment Analysis Report\",
+            f\"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\",
+            f\"Overall Sentiment: {sentiment_data.get('sentiment', 'unknown')}\",
+            f\"Confidence: {sentiment_data.get('confidence', 0) * 100:.1f}%\"
+        ]
+        
+        if 'emotions' in sentiment_data:
+            report.append(\"\\nEmotion Scores:\")
+            for emotion, score in sentiment_data['emotions'].items():
+                report.append(f\"- {emotion.capitalize()}: {float(score) * 100:.1f}%\")
+                
+        return '\\n'.join(report)
+
+# Example usage
+if __name__ == \"__main__\":
+    # Initialize with your API details
+    analyzer = SentimentAnalyzer(
+        api_url=\"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent\",
+        api_key=\"YOUR_API_KEY\"  # Replace with actual API key
+    )
+    
+    # Example analysis
+    sample_text = \"I'm feeling really happy and excited about this new project!\"
+    result = analyzer.analyze_sentiment(sample_text)
+    print(analyzer.generate_report(result))
+"""
+            
             return {
                 'code': code,
                 'model': 'gemini-1.5-flash',
-                'capabilities': [
-                    'Interactive Chat',
-                    'AI-Powered Responses',
-                    'Conversation Memory',
-                    'Natural Language Processing',
-                    'Real-time Communication'
-                ],
-                'description': f"Interactive Gemini-powered agent: {prompt[:100]}{'...' if len(prompt) > 100 else ''}"
+                'capabilities': ['sentiment_analysis', 'emotion_detection', 'text_processing'],
+                'description': 'Advanced sentiment analysis agent using Gemini AI'
             }, "success"
-        else:
-            return None, status
-
-
-# Initialize the agent creator
+            
+        except Exception as e:
+            logger.error(f"Error creating sentiment agent: {str(e)}", exc_info=True)
+            return None, f"Failed to create sentiment analysis agent: {str(e)}"
 agent_creator = GeminiAgentCreator()
 
 
@@ -622,4 +733,4 @@ if __name__ == '__main__':
     # Create agents directory if it doesn't exist
     os.makedirs('generated_agents', exist_ok=True)
 
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=8001, debug=True)

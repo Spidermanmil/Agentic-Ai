@@ -21,12 +21,23 @@
         .status.info { background: #cce7ff; color: #004085; border: 1px solid #99d6ff; }
         .result { background: #f8f9fa; padding: 20px; margin-top: 20px; border-radius: 5px; border-left: 4px solid #007bff; }
         .agent-item { background: #fff; padding: 20px; margin: 10px 0; border-radius: 8px; border: 1px solid #eee; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .agent-header { display: flex; justify-content: between; align-items: center; margin-bottom: 10px; }
+        .agent-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
         .agent-status { display: inline-block; padding: 4px 12px; border-radius: 15px; font-size: 12px; font-weight: bold; }
         .status-created { background: #e3f2fd; color: #1976d2; }
         .status-running { background: #e8f5e8; color: #388e3c; }
         .status-error { background: #ffebee; color: #d32f2f; }
-        pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 13px; }
+        pre { 
+            background: #282c34; 
+            color: #abb2bf; 
+            padding: 15px; 
+            border-radius: 5px; 
+            overflow-x: auto; 
+            font-size: 13px; 
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
         .api-status { float: right; font-size: 12px; padding: 4px 8px; border-radius: 3px; }
         .api-valid { background: #d4edda; color: #155724; }
         .api-invalid { background: #f8d7da; color: #721c24; }
@@ -35,17 +46,53 @@
         .examples h4 { margin-top: 0; color: #856404; }
         .example-prompt { background: white; padding: 8px; margin: 5px 0; border-radius: 3px; cursor: pointer; font-size: 13px; border: 1px solid #ffeaa7; }
         .example-prompt:hover { background: #ffeaa7; }
+        .code-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            background: #f8f9fa; 
+            padding: 8px 15px; 
+            border-radius: 5px; 
+            cursor: pointer;
+            margin: 10px 0;
+            border: 1px solid #e9ecef;
+        }
+        .code-header:hover { background: #e9ecef; }
+        .code-header h4 { margin: 0; }
+        .code-content { 
+            display: none;
+            margin-top: 10px;
+        }
+        .code-content.show {
+            display: block;
+        }
+        .code-content pre {
+            margin: 0;
+            border-radius: 5px;
+            max-height: 500px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>🤖 AI Agent Builder</h1>
+        <h1>AI Agent Builder</h1>
         <p>Create intelligent agents using natural language prompts • Powered by Google Gemini</p>
+    </div>
+
+    <div class="container" style="background: #e3f2fd; border: 2px solid #1976d2; margin-bottom: 25px;">
+        <h3 style="color: #1976d2;">Domain Prompts</h3>
+        <ul style="font-size: 16px; line-height: 1.7;">
+            <li><strong>Healthcare:</strong> Build an agent that provides medical information and appointment scheduling.</li>
+            <li><strong>Finance:</strong> Create an agent that analyzes stock trends and gives investment advice.</li>
+            <li><strong>Education:</strong> Make an agent that tutors students in math and science interactively.</li>
+            <li><strong>E-commerce:</strong> Develop an agent that recommends products and assists with order tracking.</li>
+            <li><strong>Travel:</strong> Design an agent that plans trips and suggests itineraries based on user preferences.</li>
+        </ul>
     </div>
 
     <div class="container">
         <div class="api-key-section">
-            <h3>🔑 Gemini API Configuration</h3>
+            <h3>Gemini API Configuration</h3>
             <p>Enter your Google Gemini API key to power your AI agents</p>
 
             <div style="display: flex; gap: 15px; align-items: end;">
@@ -66,10 +113,10 @@
         </div>
 
         <div class="prompt-section">
-            <h3>💬 Describe Your AI Agent</h3>
+            <h3> Describe Your AI Agent</h3>
 
             <div class="examples">
-                <h4>💡 Example Prompts (Click to use):</h4>
+                <h4>Example Prompts (Click to use):</h4>
                 <div class="example-prompt" onclick="setPrompt(this.textContent)">
                     Create an agent that analyzes text sentiment and generates a detailed emotional report
                 </div>
@@ -95,7 +142,7 @@ Examples:
 
             <div style="text-align: center; margin-top: 20px;">
                 <button class="create-btn" onclick="createAgent()">
-                    🚀 Create AI Agent with Gemini
+                    Create AI Agent with Gemini
                 </button>
             </div>
         </div>
@@ -105,14 +152,39 @@ Examples:
 
     <div class="container">
         <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 20px;">
-            <h3>🤖 Your AI Agents</h3>
-            <button onclick="loadAgents()">🔄 Refresh</button>
+            <h3>Domain Prompts</h3>
+            <button onclick="loadAgents()">Refresh</button>
         </div>
         <div id="agents"></div>
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8000';
+        // Helper function to escape HTML
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Toggle code visibility
+        function toggleCode(agentId) {
+            const codeContent = document.getElementById(`code-${agentId}`);
+            const header = codeContent.previousElementSibling;
+            const icon = header.querySelector('span');
+            
+            if (codeContent.style.display === 'none') {
+                codeContent.style.display = 'block';
+                icon.textContent = '▲';
+            } else {
+                codeContent.style.display = 'none';
+                icon.textContent = '▼';
+            }
+        }
+
+        const API_BASE = 'http://localhost:8001';
         let currentApiKey = '';
 
         // Load saved API key on page load
@@ -147,7 +219,7 @@ Examples:
             currentApiKey = apiKey;
             sessionStorage.setItem('gemini_api_key', apiKey);
 
-            showApiStatus('✅ API key validated and saved for this session', 'success');
+            showApiStatus('API key validated and saved for this session', 'success');
         }
 
         function clearApiKey() {
@@ -195,7 +267,7 @@ Examples:
             }
 
             document.getElementById('result').style.display = 'block';
-            document.getElementById('result').innerHTML = '🔄 Creating AI-powered agent with Gemini...';
+            document.getElementById('result').innerHTML = 'Creating AI-powered agent with Gemini...';
 
             try {
                 const response = await fetch(`${API_BASE}/create-agent`, {
@@ -209,28 +281,35 @@ Examples:
                     })
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                let result;
+                try {
+                    result = await response.json();
+                } catch (e) {
+                    result = {};
                 }
 
-                const result = await response.json();
+                if (!response.ok) {
+                    const errorMsg = result && result.error ? result.error : `HTTP error! status: ${response.status}`;
+                    document.getElementById('result').innerHTML = `Error creating agent: ${errorMsg}`;
+                    console.error('Create agent error:', errorMsg);
+                    return;
+                }
 
                 document.getElementById('result').innerHTML = `
-                    <h4>✅ AI Agent Created Successfully!</h4>
+                    <h4>AI Agent Created Successfully!</h4>
                     <div><strong>Agent ID:</strong> ${result.agent_id}</div>
                     <div><strong>Type:</strong> Gemini-Powered AI Agent</div>
                     <div><strong>Capabilities:</strong> ${result.capabilities ? result.capabilities.join(', ') : 'AI-Enhanced Processing'}</div>
                     <div><strong>Status:</strong> <span class="agent-status status-created">Ready</span></div>
                     <details style="margin-top: 15px;">
                         <summary><strong>Generated Code Preview</strong></summary>
-                        <pre>${result.code.substring(0, 500)}${result.code.length > 500 ? '...\n\n[Code truncated - full code available in agent execution]' : ''}</pre>
+                        <pre>${result.code && result.code.substring ? result.code.substring(0, 500) : ''}${result.code && result.code.length > 500 ? '...\n\n[Code truncated - full code available in agent execution]' : ''}</pre>
                     </details>
                 `;
 
                 loadAgents();
-
             } catch (error) {
-                document.getElementById('result').innerHTML = `❌ Error creating agent: ${error.message}`;
+                document.getElementById('result').innerHTML = `Error creating agent: ${error.message}`;
                 console.error('Create agent error:', error);
             }
         }
@@ -268,7 +347,7 @@ Examples:
             const resultElement = document.getElementById(`result-${agentId}`);
             if (resultElement) {
                 resultElement.innerHTML = `
-                    <h4>🎯 Execution Results:</h4>
+                    <h4>Execution Results:</h4>
                     <div><strong>Status:</strong> ${result.status}</div>
                     ${result.output ? `<div><strong>Output:</strong></div><pre>${result.output}</pre>` : ''}
                     ${result.error ? `<div style="color: red;"><strong>Error:</strong> ${result.error}</div>` : ''}
@@ -289,7 +368,7 @@ Examples:
 
                 const agentsDiv = document.getElementById('agents');
                 if (agents.length === 0) {
-                    agentsDiv.innerHTML = '<div class="agent-item"><p>No AI agents created yet. Create your first agent above! 👆</p></div>';
+                    agentsDiv.innerHTML = '<div class="agent-item"><p>No AI agents created yet. Create your first agent above! </p></div>';
                 } else {
                     agentsDiv.innerHTML = agents.map(agent => `
                         <div class="agent-item">
@@ -308,6 +387,14 @@ Examples:
                             <div><strong>ID:</strong> ${agent.id}</div>
                             <div><strong>Created:</strong> ${new Date(agent.created_at).toLocaleString()}</div>
                             <div><strong>AI Model:</strong> Google Gemini</div>
+                            
+                            <div class="code-header" onclick="toggleCode('${agent.id}')">
+                                <h4>View Generated Code</h4>
+                                <span>▼</span>
+                            </div>
+                            <div id="code-${agent.id}" class="code-content" style="display: none;">
+                                <pre><code>${escapeHtml(agent.code || 'No code available')}</code></pre>
+                            </div>
 
                             <div id="status-${agent.id}" class="status" style="display: none;"></div>
                             <div id="result-${agent.id}" style="display: none; margin-top: 10px;"></div>
