@@ -8,6 +8,7 @@ import time
 from datetime import datetime
 import requests
 import logging
+from deploy_to_pi import deploy_latest_agent
 
 app = Flask(__name__)
 CORS(app)
@@ -587,6 +588,7 @@ def create_agent():
         agent_file_path = f"{agent_dir}/agent.py"
         with open(agent_file_path, 'w', encoding='utf-8') as f:
             f.write(agent_data['code'])
+        
 
         # Create metadata
         metadata = {
@@ -622,6 +624,36 @@ def create_agent():
         logger.error(f"Agent creation error: {str(e)}")
         return jsonify({'error': f'Failed to create agent: {str(e)}'}), 500
 
+import paramiko
+
+def send_to_pi(file_path):
+    """Send generated agent file to Raspberry Pi and execute it."""
+    pi_ip = ""     # ← replace with your Pi's IP
+    pi_user = ""
+    pi_pass = ""      # ← replace with your Pi password
+
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(pi_ip, username=pi_user, password=pi_pass)
+
+        sftp = ssh.open_sftp()
+        remote_path = f"/home/pi/{os.path.basename(file_path)}"
+        sftp.put(file_path, remote_path)
+        sftp.close()
+
+        # Run it on the Pi and capture the output
+        stdin, stdout, stderr = ssh.exec_command(f"python3 {remote_path}")
+        print("----- Raspberry Pi Output -----")
+        print(stdout.read().decode())
+        print(stderr.read().decode())
+        print("-------------------------------")
+
+        ssh.close()
+        print(f"✅ Sent and executed {file_path} on Raspberry Pi.")
+
+    except Exception as e:
+        print(f"❌ Failed to send file to Raspberry Pi: {str(e)}")
 
 @app.route('/execute-agent/<agent_id>', methods=['POST'])
 def execute_agent(agent_id):
