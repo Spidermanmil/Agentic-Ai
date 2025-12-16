@@ -3,7 +3,7 @@ import os
 import time
 import select
 
-def deploy_latest_agent(PI_IP, PI_USER, PI_PASSWORD, LOCAL_PATH, REMOTE_PATH="/home/prath/gemini_agents/generated_agents"):
+def deploy_latest_agent(PI_IP, PI_USER, PI_PASSWORD, LOCAL_PATH, REMOTE_PATH=""):
     FILES_TO_COPY = ["agent.py"]  # only the agent that reads the sensor
 
     ssh = paramiko.SSHClient()
@@ -62,7 +62,7 @@ def deploy_latest_agent(PI_IP, PI_USER, PI_PASSWORD, LOCAL_PATH, REMOTE_PATH="/h
         print("\nSSH connection closed.")
 
 if __name__ == "__main__":
-    PI_IP = ""  
+    PI_IP = ""  # your Pi IP
     PI_USER = ""
     PI_PASSWORD = ""
     LOCAL_PATH = r""
